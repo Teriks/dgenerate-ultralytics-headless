@@ -133,35 +133,29 @@ jobs:
           python -m build
           ls -la dist/
       
-      # Rename the original wheel and source dist for PyPI upload
+      # Handle the wheel/sdist that already has the correct package name
       - name: Prepare distributions for PyPI
         working-directory: ${{ steps.download.outputs.source_dir }}
         run: |
-          # Get the original wheel filename
-          ORIGINAL_WHEEL=$(ls dist/*.whl)
-          echo "Original wheel: $ORIGINAL_WHEEL"
+          # List all distribution files
+          echo "Distribution files:"
+          ls -la dist/
           
-          # Extract version from wheel filename
-          VERSION=$(echo $ORIGINAL_WHEEL | grep -oP '(?<=ultralytics-)[0-9]+\.[0-9]+\.[0-9]+')
+          # Get the wheel filename - now already has correct package name
+          WHEEL_FILE=$(ls dist/*.whl)
+          echo "Wheel file: $WHEEL_FILE"
+          
+          # Extract version from wheel filename using the new pattern
+          VERSION=$(echo $WHEEL_FILE | grep -oP '(?<=dgenerate_ultralytics_headless-)[0-9]+\.[0-9]+\.[0-9]+')
           echo "Detected version: $VERSION"
           
-          # Rename the wheel with the new package name
-          NEW_WHEEL="dist/dgenerate-ultralytics-headless-${VERSION}-py3-none-any.whl"
-          mv $ORIGINAL_WHEEL $NEW_WHEEL
-          echo "Renamed wheel to: $NEW_WHEEL"
-          
-          # Rename the source distribution (if it exists)
-          ORIGINAL_SDIST=$(ls dist/*.tar.gz)
-          if [ $? -eq 0 ]; then
-            NEW_SDIST="dist/dgenerate-ultralytics-headless-${VERSION}.tar.gz"
-            mv $ORIGINAL_SDIST $NEW_SDIST
-            echo "Renamed source dist to: $NEW_SDIST"
+          # Check for source distribution
+          SDIST_FILE=$(ls dist/*.tar.gz 2>/dev/null || echo "")
+          if [ -n "$SDIST_FILE" ]; then
+            echo "Source distribution: $SDIST_FILE"
           else
             echo "No source distribution found"
           fi
-          
-          # List all dist files
-          ls -la dist/
 
       - name: Upload distributions as artifacts
         uses: actions/upload-artifact@v4
