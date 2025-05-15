@@ -77,21 +77,21 @@ jobs:
         run: |
           # For pyproject.toml
           if [ -f "pyproject.toml" ]; then
-            sed -i 's/python-opencv/python-opencv-headless/g' pyproject.toml
+            sed -i 's/opencv-python/opencv-python-headless/g' pyproject.toml
             echo "Modified pyproject.toml:"
             cat pyproject.toml | grep opencv
           fi
           
           # For requirements.txt
           if [ -f "requirements.txt" ]; then
-            sed -i 's/python-opencv/python-opencv-headless/g' requirements.txt
+            sed -i 's/opencv-python/opencv-python-headless/g' requirements.txt
             echo "Modified requirements.txt:"
             cat requirements.txt | grep opencv
           fi
           
           # For setup.py if it exists
           if [ -f "setup.py" ]; then
-            sed -i 's/python-opencv/python-opencv-headless/g' setup.py
+            sed -i 's/opencv-python/opencv-python-headless/g' setup.py
             echo "Modified setup.py:"
             cat setup.py | grep opencv
           fi
@@ -99,6 +99,27 @@ jobs:
       - name: Update package metadata
         working-directory: ${{ steps.download.outputs.source_dir }}
         run: |
+          # Get version from the tag (remove 'v' prefix if present)
+          VERSION=${{ needs.check-release-and-build.outputs.version }}
+          VERSION_NUM=${VERSION#v}
+          echo "Original version: $VERSION_NUM"
+          
+          # Add .post0 for version 8.3.134
+          if [ "$VERSION_NUM" = "8.3.134" ]; then
+            NEW_VERSION="${VERSION_NUM}.post0"
+            echo "Adding .post0 suffix to version 8.3.134"
+            echo "New version: $NEW_VERSION"
+            
+            # Update version in ultralytics/__init__.py
+            if [ -f "ultralytics/__init__.py" ]; then
+              sed -i "s/__version__ = \"$VERSION_NUM\"/__version__ = \"$NEW_VERSION\"/" "ultralytics/__init__.py"
+              echo "Updated version in ultralytics/__init__.py:"
+              grep "__version__" "ultralytics/__init__.py"
+            else
+              echo "Could not find ultralytics/__init__.py"
+            fi
+          fi
+          
           # Update pyproject.toml description and Source URL
           if [ -f "pyproject.toml" ]; then
             # Replace the package name
@@ -111,7 +132,7 @@ jobs:
             sed -i 's|"Source" = "https://github.com/ultralytics/ultralytics"|"Source" = "https://github.com/Teriks/dgenerate-ultralytics-headless"|' pyproject.toml
             
             echo "Modified pyproject.toml metadata:"
-            cat pyproject.toml | grep -E 'name =|description|Source'
+            cat pyproject.toml | grep -E 'name =|version|description|Source'
           fi
           
           # Prepend our README to Ultralytics README
@@ -190,45 +211,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  publish-to-pypi:
-    needs: [check-release-and-build, build-wheels]
-    runs-on: ubuntu-latest
-    if: needs.check-release-and-build.outputs.new_release == 'true'
-    steps:
-      - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: wheels
-          path: ./wheels
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install twine
-
-      - name: List wheels
-        run: |
-          ls -la ./wheels/
-          
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          # List files for debugging
-          echo "Files in wheels directory:"
-          ls -la wheels/
-          
-          # Upload any distributions we find
-          if [ "$(ls -A wheels/)" ]; then
-            python -m twine upload wheels/*
-            echo "Successfully published to PyPI"
-          else
-            echo "No distribution files found. Skipping PyPI upload."
-            exit 1
-          fi 
