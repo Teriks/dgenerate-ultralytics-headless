@@ -1,0 +1,132 @@
+name: Build Ultralytics Headless Wheels
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  check-release-and-build:
+    runs-on: ubuntu-latest
+    outputs:
+      new_release: ${{ steps.check_release.outputs.new_release }}
+      version: ${{ steps.check_release.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check for new Ultralytics release
+        id: check_release
+        run: |
+          # Get the latest release tag from Ultralytics repo
+          LATEST_TAG=$(curl -s https://api.github.com/repos/ultralytics/ultralytics/releases/latest | jq -r .tag_name)
+          echo "Latest Ultralytics release: $LATEST_TAG"
+          
+          # Check if we already have this version
+          if curl -s -f -I "https://github.com/${{ github.repository }}/releases/tag/$LATEST_TAG" > /dev/null; then
+            echo "Release $LATEST_TAG already exists in this repository"
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "New release found: $LATEST_TAG"
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
+
+  build-wheels:
+    needs: check-release-and-build
+    if: needs.check-release-and-build.outputs.new_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+          pip install requests
+
+      - name: Download Ultralytics source
+        id: download
+        run: |
+          VERSION=${{ needs.check-release-and-build.outputs.version }}
+          # Remove 'v' prefix if present
+          VERSION_NUM=${VERSION#v}
+          
+          echo "Downloading Ultralytics version $VERSION_NUM"
+          DOWNLOAD_URL="https://github.com/ultralytics/ultralytics/archive/refs/tags/$VERSION.tar.gz"
+          wget $DOWNLOAD_URL -O ultralytics.tar.gz
+          
+          # Extract the source
+          mkdir -p ultralytics-source
+          tar -xzf ultralytics.tar.gz -C ultralytics-source --strip-components=1
+          
+          echo "source_dir=ultralytics-source" >> $GITHUB_OUTPUT
+
+      - name: Modify dependencies
+        working-directory: ${{ steps.download.outputs.source_dir }}
+        run: |
+          # For pyproject.toml
+          if [ -f "pyproject.toml" ]; then
+            sed -i 's/opencv-python/opencv-python-headless/g' pyproject.toml
+            echo "Modified pyproject.toml:"
+            cat pyproject.toml | grep opencv
+          fi
+          
+          # For requirements.txt
+          if [ -f "requirements.txt" ]; then
+            sed -i 's/opencv-python/opencv-python-headless/g' requirements.txt
+            echo "Modified requirements.txt:"
+            cat requirements.txt | grep opencv
+          fi
+          
+          # For setup.py if it exists
+          if [ -f "setup.py" ]; then
+            sed -i 's/opencv-python/opencv-python-headless/g' setup.py
+            echo "Modified setup.py:"
+            cat setup.py | grep opencv
+          fi
+
+      - name: Build wheels
+        working-directory: ${{ steps.download.outputs.source_dir }}
+        run: |
+          python -m build --wheel
+          ls -la dist/
+
+      - name: Upload wheels as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: ${{ steps.download.outputs.source_dir }}/dist/*.whl
+
+  create-release:
+    needs: [check-release-and-build, build-wheels]
+    runs-on: ubuntu-latest
+    if: needs.check-release-and-build.outputs.new_release == 'true'
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: ./wheels
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-release-and-build.outputs.version }}
+          name: "Ultralytics Headless ${{ needs.check-release-and-build.outputs.version }}"
+          body: |
+            Ultralytics with opencv-python-headless instead of opencv-python
+            
+            This is an automated release based on Ultralytics version ${{ needs.check-release-and-build.outputs.version }}
+          files: ./wheels/*.whl
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
