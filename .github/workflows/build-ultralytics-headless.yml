@@ -102,7 +102,7 @@ jobs:
           python -m build --wheel
           ls -la dist/
           
-      # Add step to rename the wheel file for PyPI upload
+      # Rename the original wheel file for PyPI upload instead of creating a copy
       - name: Prepare wheel for PyPI
         working-directory: ${{ steps.download.outputs.source_dir }}
         run: |
@@ -114,10 +114,10 @@ jobs:
           VERSION=$(echo $ORIGINAL_WHEEL | grep -oP '(?<=ultralytics-)[0-9]+\.[0-9]+\.[0-9]+')
           echo "Detected version: $VERSION"
           
-          # Create a copy with the new package name
+          # Rename the wheel with the new package name
           NEW_WHEEL="dist/dgenerate-ultralytics-headless-${VERSION}-py3-none-any.whl"
-          cp $ORIGINAL_WHEEL $NEW_WHEEL
-          echo "Created renamed wheel: $NEW_WHEEL"
+          mv $ORIGINAL_WHEEL $NEW_WHEEL
+          echo "Renamed wheel to: $NEW_WHEEL"
           
           # List all wheels
           ls -la dist/
