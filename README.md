@@ -18,10 +18,10 @@ The standard Ultralytics package depends on `python-opencv`, which requires a GU
 
 ## Usage
 
-To use the modified wheels, you can download them directly from the [Releases](../../releases) page of this repository. Install them with pip:
+To use the modified release, install it with pip:
 
 ```bash
-pip install ultralytics-*.whl
+pip install dgenerate-ultralytics-headless
 ```
 
 ## Manual Trigger
