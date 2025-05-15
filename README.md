@@ -14,7 +14,7 @@ The GitHub Action performs the following steps:
 
 ## Why use this?
 
-The standard Ultralytics package depends on `opencv-python`, which requires a GUI environment. This can cause issues in headless environments like servers or containers. By replacing it with `opencv-python-headless`, you can use Ultralytics in these environments without GUI dependencies.
+The standard Ultralytics package depends on `python-opencv`, which requires a GUI environment. This can cause issues in headless environments like servers or containers. By replacing it with `python-opencv-headless`, you can use Ultralytics in these environments without GUI dependencies.
 
 ## Usage
 
