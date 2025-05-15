@@ -77,33 +77,61 @@ jobs:
         run: |
           # For pyproject.toml
           if [ -f "pyproject.toml" ]; then
-            sed -i 's/opencv-python/opencv-python-headless/g' pyproject.toml
+            sed -i 's/python-opencv/python-opencv-headless/g' pyproject.toml
             echo "Modified pyproject.toml:"
             cat pyproject.toml | grep opencv
           fi
           
           # For requirements.txt
           if [ -f "requirements.txt" ]; then
-            sed -i 's/opencv-python/opencv-python-headless/g' requirements.txt
+            sed -i 's/python-opencv/python-opencv-headless/g' requirements.txt
             echo "Modified requirements.txt:"
             cat requirements.txt | grep opencv
           fi
           
           # For setup.py if it exists
           if [ -f "setup.py" ]; then
-            sed -i 's/opencv-python/opencv-python-headless/g' setup.py
+            sed -i 's/python-opencv/python-opencv-headless/g' setup.py
             echo "Modified setup.py:"
             cat setup.py | grep opencv
+          fi
+
+      - name: Update package metadata
+        working-directory: ${{ steps.download.outputs.source_dir }}
+        run: |
+          # Update pyproject.toml description and homepage URL
+          if [ -f "pyproject.toml" ]; then
+            # Replace the description
+            sed -i 's/description = ".*"/description = "Automatically built Ultralytics package with python-opencv-headless dependency instead of python-opencv"/' pyproject.toml
+            
+            # Replace the homepage URL
+            sed -i 's|url = ".*"|url = "https://github.com/Teriks/dgenerate-ultralytics-headless"|' pyproject.toml
+            
+            echo "Modified pyproject.toml metadata:"
+            cat pyproject.toml | grep -E 'description|url'
+          fi
+          
+          # Prepend our README to Ultralytics README
+          if [ -f "README.md" ]; then
+            # Get our README content from the repository
+            cat "$GITHUB_WORKSPACE/README.md" > temp_readme
+            echo -e "\n---\n" >> temp_readme  # Add divider
+            cat README.md >> temp_readme
+            mv temp_readme README.md
+            
+            echo "Updated README.md with our content"
+            head -20 README.md
           fi
 
       - name: Build wheels
         working-directory: ${{ steps.download.outputs.source_dir }}
         run: |
-          python -m build --wheel
+          # Build both wheel and source distribution
+          python -m build
           ls -la dist/
-          
-      # Rename the original wheel file for PyPI upload instead of creating a copy
-      - name: Prepare wheel for PyPI
+      
+      # Rename the original wheel and source dist for PyPI upload
+      - name: Prepare distributions for PyPI
         working-directory: ${{ steps.download.outputs.source_dir }}
         run: |
           # Get the original wheel filename
@@ -119,14 +147,24 @@ jobs:
           mv $ORIGINAL_WHEEL $NEW_WHEEL
           echo "Renamed wheel to: $NEW_WHEEL"
           
-          # List all wheels
+          # Rename the source distribution (if it exists)
+          ORIGINAL_SDIST=$(ls dist/*.tar.gz)
+          if [ $? -eq 0 ]; then
+            NEW_SDIST="dist/dgenerate-ultralytics-headless-${VERSION}.tar.gz"
+            mv $ORIGINAL_SDIST $NEW_SDIST
+            echo "Renamed source dist to: $NEW_SDIST"
+          else
+            echo "No source distribution found"
+          fi
+          
+          # List all dist files
           ls -la dist/
 
-      - name: Upload wheels as artifacts
+      - name: Upload distributions as artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wheels
-          path: ${{ steps.download.outputs.source_dir }}/dist/*.whl
+          path: ${{ steps.download.outputs.source_dir }}/dist/*
 
   create-release:
     needs: [check-release-and-build, build-wheels]
@@ -146,10 +184,10 @@ jobs:
           tag_name: ${{ needs.check-release-and-build.outputs.version }}
           name: "Ultralytics Headless ${{ needs.check-release-and-build.outputs.version }}"
           body: |
-            Ultralytics with opencv-python-headless instead of opencv-python
+            Ultralytics with python-opencv-headless instead of python-opencv
             
             This is an automated release based on Ultralytics version ${{ needs.check-release-and-build.outputs.version }}
-          files: ./wheels/*.whl
+          files: ./wheels/*
           draft: false
           prerelease: false
         env:
@@ -185,12 +223,12 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          # Check if we have any dgenerate-ultralytics-headless wheels
-          if ls wheels/dgenerate-ultralytics-headless-*.whl 1> /dev/null 2>&1; then
-            # Upload only the renamed wheel
-            python -m twine upload wheels/dgenerate-ultralytics-headless-*.whl
+          # Check if we have any dgenerate-ultralytics-headless distributions
+          if ls wheels/dgenerate-ultralytics-headless-* 1> /dev/null 2>&1; then
+            # Upload all distributions
+            python -m twine upload wheels/dgenerate-ultralytics-headless-*
             echo "Successfully published dgenerate-ultralytics-headless to PyPI"
           else
-            echo "No dgenerate-ultralytics-headless wheels found. Skipping PyPI upload."
+            echo "No dgenerate-ultralytics-headless distributions found. Skipping PyPI upload."
             exit 1
           fi 
