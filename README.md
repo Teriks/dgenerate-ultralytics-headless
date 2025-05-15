@@ -8,7 +8,7 @@ The GitHub Action performs the following steps:
 
 1. Checks daily for new Ultralytics releases
 2. Downloads the source code when a new release is detected
-3. Replaces `opencv-python` with `opencv-python-headless` in dependency files
+3. Replaces `opencv-python` with `opencv-python-headless` in dependency spec
 4. Builds wheels for the modified package
 5. Creates a new release in this repository with the built wheels
 
@@ -23,10 +23,6 @@ To use the modified release, install it with pip:
 ```bash
 pip install dgenerate-ultralytics-headless
 ```
-
-## Manual Trigger
-
-You can manually trigger the workflow by going to the Actions tab in the repository and selecting "Build Ultralytics Headless Wheels" workflow, then clicking "Run workflow".
 
 ## Automation
 
