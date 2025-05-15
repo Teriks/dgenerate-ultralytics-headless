@@ -5,6 +5,10 @@ on:
     - cron: '0 0 * * *'  # Run daily at midnight
   workflow_dispatch:  # Allow manual triggering
 
+# Add permissions block at the workflow level
+permissions:
+  contents: write  # This permission is needed to create releases
+
 jobs:
   check-release-and-build:
     runs-on: ubuntu-latest
