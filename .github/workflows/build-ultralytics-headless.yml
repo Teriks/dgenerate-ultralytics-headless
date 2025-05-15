@@ -202,7 +202,7 @@ jobs:
           tag_name: ${{ needs.check-release-and-build.outputs.version }}
           name: "Ultralytics Headless ${{ needs.check-release-and-build.outputs.version }}"
           body: |
-            Ultralytics with python-opencv-headless instead of python-opencv
+            Ultralytics with opencv-python-headless instead of opencv-python
             
             This is an automated release based on Ultralytics version ${{ needs.check-release-and-build.outputs.version }}
           files: ./wheels/*
