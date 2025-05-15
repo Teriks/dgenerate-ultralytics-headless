@@ -101,6 +101,9 @@ jobs:
         run: |
           # Update pyproject.toml description and Source URL
           if [ -f "pyproject.toml" ]; then
+            # Replace the package name
+            sed -i 's/name = "ultralytics"/name = "dgenerate-ultralytics-headless"/' pyproject.toml
+            
             # Replace the description
             sed -i 's/description = ".*"/description = "Automatically built Ultralytics package with python-opencv-headless dependency instead of python-opencv"/' pyproject.toml
             
@@ -108,7 +111,7 @@ jobs:
             sed -i 's|"Source" = "https://github.com/ultralytics/ultralytics"|"Source" = "https://github.com/Teriks/dgenerate-ultralytics-headless"|' pyproject.toml
             
             echo "Modified pyproject.toml metadata:"
-            cat pyproject.toml | grep -E 'description|Source'
+            cat pyproject.toml | grep -E 'name =|description|Source'
           fi
           
           # Prepend our README to Ultralytics README
