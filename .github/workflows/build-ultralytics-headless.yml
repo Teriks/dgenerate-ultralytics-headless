@@ -220,12 +220,15 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          # Check if we have any dgenerate-ultralytics-headless distributions
-          if ls wheels/dgenerate-ultralytics-headless-* 1> /dev/null 2>&1; then
-            # Upload all distributions
-            python -m twine upload wheels/dgenerate-ultralytics-headless-*
-            echo "Successfully published dgenerate-ultralytics-headless to PyPI"
+          # List files for debugging
+          echo "Files in wheels directory:"
+          ls -la wheels/
+          
+          # Upload any distributions we find
+          if [ "$(ls -A wheels/)" ]; then
+            python -m twine upload wheels/*
+            echo "Successfully published to PyPI"
           else
-            echo "No dgenerate-ultralytics-headless distributions found. Skipping PyPI upload."
+            echo "No distribution files found. Skipping PyPI upload."
             exit 1
           fi 
