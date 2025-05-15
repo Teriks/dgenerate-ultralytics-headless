@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel setuptools
+          pip install build wheel setuptools twine
           pip install requests
 
       - name: Download Ultralytics source
@@ -101,6 +101,26 @@ jobs:
         run: |
           python -m build --wheel
           ls -la dist/
+          
+      # Add step to rename the wheel file for PyPI upload
+      - name: Prepare wheel for PyPI
+        working-directory: ${{ steps.download.outputs.source_dir }}
+        run: |
+          # Get the original wheel filename
+          ORIGINAL_WHEEL=$(ls dist/*.whl)
+          echo "Original wheel: $ORIGINAL_WHEEL"
+          
+          # Extract version from wheel filename
+          VERSION=$(echo $ORIGINAL_WHEEL | grep -oP '(?<=ultralytics-)[0-9]+\.[0-9]+\.[0-9]+')
+          echo "Detected version: $VERSION"
+          
+          # Create a copy with the new package name
+          NEW_WHEEL="dist/dgenerate-ultralytics-headless-${VERSION}-py3-none-any.whl"
+          cp $ORIGINAL_WHEEL $NEW_WHEEL
+          echo "Created renamed wheel: $NEW_WHEEL"
+          
+          # List all wheels
+          ls -la dist/
 
       - name: Upload wheels as artifacts
         uses: actions/upload-artifact@v4
@@ -133,4 +153,44 @@ jobs:
           draft: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-to-pypi:
+    needs: [check-release-and-build, build-wheels]
+    runs-on: ubuntu-latest
+    if: needs.check-release-and-build.outputs.new_release == 'true'
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels
+          path: ./wheels
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+
+      - name: List wheels
+        run: |
+          ls -la ./wheels/
+          
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          # Check if we have any dgenerate-ultralytics-headless wheels
+          if ls wheels/dgenerate-ultralytics-headless-*.whl 1> /dev/null 2>&1; then
+            # Upload only the renamed wheel
+            python -m twine upload wheels/dgenerate-ultralytics-headless-*.whl
+            echo "Successfully published dgenerate-ultralytics-headless to PyPI"
+          else
+            echo "No dgenerate-ultralytics-headless wheels found. Skipping PyPI upload."
+            exit 1
+          fi 
